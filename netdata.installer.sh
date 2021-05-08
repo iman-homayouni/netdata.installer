@@ -29,7 +29,7 @@ unset q
 
 
 # CHECK CONFIG FILE # ------------------------------------------------------------------------------------------------------------------------------------- #
-if [ -f netdata.installer.conf ]
+if [ -f netdata.installer.conf ] ; then
     source netdata.installer.conf
 else
     echo -e "[>] cannot access 'netdata.installer.conf': No such file or directory"
