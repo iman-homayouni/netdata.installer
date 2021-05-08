@@ -4,8 +4,8 @@
 # Email : homayouni.iman@Gmail.com
 # Website : http://www.homayouni.info
 # License : GPL v2.0
-# Last update : 11-March-2021_19:53:05
-# netdata.installer v1.0.1
+# Last update : Sat, 08 May 2021 15:51:39 +0430
+# netdata.installer v1.0.2
 # --------------------------------------------------------------------------------------------------------------------------------------------------------- #
 # SUCCESSFULLY TESTED IN UBUNTU 18.04 [BIONIC]
 # SUCCESSFULLY TESTED IN UBUNTU 20.04 [FOCAL]
@@ -22,8 +22,6 @@ echo -e "[>>] Email : homayouni.iman@Gmail.com                            [<<]"
 echo -e "[>>] ----------------------------------------------------------- [<<]"
 echo -e "[>>] INSTALL NETDATA IN UBUNTU 18.04 & 20.04                     [<<]"
 echo -e "[>>] ----------------------------------------------------------- [<<]"
-echo -en "[>>] PRESS ENTER TO CONTINUE " ; read q
-unset q
 # --------------------------------------------------------------------------------------------------------------------------------------------------------- #
 
 
@@ -32,7 +30,7 @@ unset q
 if [ -f netdata.installer.conf ] ; then
     source netdata.installer.conf
 else
-    echo -e "[>] cannot access 'netdata.installer.conf': No such file or directory"
+    echo -e "\e[91m [>] CANNOT ACCESS 'netdata.installer.conf': NO SUCH FILE OR DIRECTORY \e[0m"
     exit 1
 fi
 # --------------------------------------------------------------------------------------------------------------------------------------------------------- #
@@ -41,17 +39,22 @@ fi
 
 # CHECK VARIABLES # --------------------------------------------------------------------------------------------------------------------------------------- #
 if [ -z "$netdata_listen_port" ] ; then
-    echo -e "[>] netdata_listen_port variable is empty"
+    echo -e "\e[91m [>] netdata_listen_port VARIABLE IS EMPTY \e[0m"
     exit 1
 fi
 
 if [ -z "$netdata_panel_username" ] ; then
-    echo -e "[>] netdata_panel_username variable is empty"
+    echo -e "\e[91m [>] netdata_panel_username VARIABLE IS EMPTY \e[0m"
     exit 1
 fi
 
 if [ -z "$netdata_panel_password" ] ; then
-    echo -e "[>] netdata_panel_password variable is empty"
+    echo -e "\e[91m [>] netdata_panel_password VARIABLE IS EMPTY \e[0m"
+    exit 1
+fi
+
+if [ -z "$force_nginx_installation" ] ; then
+    echo -e "\e[91m [>] force_nginx_installation VARIABLE IS EMPTY \e[0m"
     exit 1
 fi
 # --------------------------------------------------------------------------------------------------------------------------------------------------------- #
@@ -65,20 +68,33 @@ apt -y autoremove
 apt-get -y -f install
 apt-get clean
 apt-get install -y lsb-release &> /dev/null
+apt-get install -y net-tools &> /dev/null
 # --------------------------------------------------------------------------------------------------------------------------------------------------------- #
 
 
 
 # CHECK lsb_release # ------------------------------------------------------------------------------------------------------------------------------------- #
 which lsb_release &> /dev/null
-[ "$?" != "0" ] && echo -e "\e[91m[>] WE CAN NOT FIND lsb_release COMMAND\e[0m" && exit !
+[ "$?" != "0" ] && echo -e "\e[91m [>] WE CAN NOT FIND lsb_release COMMAND \e[0m" && exit !
 # --------------------------------------------------------------------------------------------------------------------------------------------------------- #
+
 
 
 # CHECK OS CODENAME # ------------------------------------------------------------------------------------------------------------------------------------- #
 lsb_release -cs | grep 'focal\|bionic' &> /dev/null
-[ "$?" != "0" ] && echo -e "\e[91m[>] WE CAN NOT INSTALL NETDATA IN YOUR OS\e[0m"
+[ "$?" != "0" ] && echo -e "\e[91m [>] WE CAN NOT INSTALL NETDATA IN YOUR OS \e[0m"
 # --------------------------------------------------------------------------------------------------------------------------------------------------------- #
+
+
+
+# CHECK netdata_listen_port PORT # ------------------------------------------------------------------------------------------------------------------------ #
+netstat -ptnul | grep "\:$netdata_listen_port" &> /dev/null
+if [ "$?" = "0" ] ; then
+    echo -e "\e[91m [>] $netdata_listen_port WAS RESERVED. CHANGE netdata_listen_port VARIABLE IN netdata.installer.conf FILE \e[0m"
+    exit 1
+fi
+# --------------------------------------------------------------------------------------------------------------------------------------------------------- #
+
 
 
 # INSTALL netdata PACKAGES # ------------------------------------------------------------------------------------------------------------------------------ #
@@ -86,28 +102,49 @@ apt-get -y install netdata
 # --------------------------------------------------------------------------------------------------------------------------------------------------------- #
 
 
+
 # CHECK NGINX PACAKGE IN SYSTEM # ------------------------------------------------------------------------------------------------------------------------- #
-dpkg -V nginx &> /dev/null
-if [ "$?" = "0" ] ; then
-    echo -e "\e[91m[>] FIND NGINX PACKAGE IN SYSTEM"
-    echo -e "[>] WE NEED TO CHANGE SOME CONFIGURATION IN SYSTEM\e[0m"
-    echo -en "[>] ARE YOU SURE ABOUT THAT ? [y/n] : " ; read q
-    if [ "$q" != "y" ] ; then
-        exit 1
+if [ "$force_nginx_installation" != "yes" ] ; then
+    dpkg -V nginx &> /dev/null
+    if [ "$?" = "0" ] ; then
+        echo -e "\e[91m [>] FIND NGINX PACKAGE IN SYSTEM"
+        echo -e "[>] WE NEED TO CHANGE SOME CONFIGURATION IN SYSTEM \e[0m"
+        echo -en "[>] ARE YOU SURE ABOUT THAT ? [y/n] : " ; read q
+        if [ "$q" != "y" ] ; then
+            exit 1
+        fi
     fi
 fi
 # --------------------------------------------------------------------------------------------------------------------------------------------------------- #
 
 
+
 # INSTALL NGINX PACKAGE # --------------------------------------------------------------------------------------------------------------------------------- #
-apt-get -y install nginx apache2-utils
+apt-get -y install nginx
+[ "$?" != "0" ] && echo -e "\e[91m [>] WE CAN NOT INSTALL NGINX PACKAGE \e[0m" && exit 1
 # --------------------------------------------------------------------------------------------------------------------------------------------------------- #
+
+
+# INSTALL apache2-utils PACKAGE # ------------------------------------------------------------------------------------------------------------------------- #
+apt-get -y install apache2-utils
+[ "$?" != "0" ] && echo -e "\e[91m [>] WE CAN NOT INSTALL apache2-utils PACKAGE \e[0m" && exit 1
+# --------------------------------------------------------------------------------------------------------------------------------------------------------- #
+
 
 
 # STOP NETDATA AND NGINX SERVICE # ------------------------------------------------------------------------------------------------------------------------ #
 systemctl stop netdata
 systemctl stop nginx
 # --------------------------------------------------------------------------------------------------------------------------------------------------------- #
+
+
+
+# CHECK NGINX CONFIGURATION DIRECTORY # ------------------------------------------------------------------------------------------------------------------- #
+if [ ! -d "/etc/nginx/" ] ; then
+    echo -e "\e[91m [>] WE CAN NOT FIND NGINX DIRECTORY IN /etc \e[0m"
+fi
+# --------------------------------------------------------------------------------------------------------------------------------------------------------- #
+
 
 
 # CREATE NETDATA CONFIGURATION FILE IN NGINX # ------------------------------------------------------------------------------------------------------------ #
@@ -143,24 +180,9 @@ EOF
 # --------------------------------------------------------------------------------------------------------------------------------------------------------- #
 
 
-# GET USERNAME FROM USER # -------------------------------------------------------------------------------------------------------------------------------- #
-# for (( ;; )) ; do
-#    echo -en "[>] ENTER USERNAME [FOR NETDATA] : " ; read username
-#    if [ ! -z "$username" ] ; then
-#        echo -en "[>] ARE YOU SURE ABOUT USER $username ? [y/n] : " ; read q
-#        if [ "$q" = "y" ] ; then
-#            break
-#        fi
-#    fi
-#    clear
-# done
-# --------------------------------------------------------------------------------------------------------------------------------------------------------- #
-
 
 # CREATE USERNAME AND PASSWORD FOR NETDATA PANEL # -------------------------------------------------------------------------------------------------------- #
-# echo -e "[>] SET PASSWORD FOR USER $username"
-# htpasswd -c /etc/nginx/.htpasswd $netdata_panel_username
-htpasswd -cdb /root/.htpasswd-all $netdata_panel_username $netdata_panel_password
+htpasswd -cdb /etc/nginx/.htpasswd-all $netdata_panel_username $netdata_panel_password
 # --------------------------------------------------------------------------------------------------------------------------------------------------------- #
 
 
@@ -178,4 +200,27 @@ clear
 # SHOW SERVICE STATUS # ----------------------------------------------------------------------------------------------------------------------------------- #
 systemctl status netdata
 systemctl status nginx
+# --------------------------------------------------------------------------------------------------------------------------------------------------------- #
+
+
+
+# FIND SERVER IP ADDRESS # -------------------------------------------------------------------------------------------------------------------------------- #
+server_ip_address=$(ifconfig | sed -En 's/127.0.0.1//;s/.*inet (addr:)?(([0-9]*\.){3}[0-9]*).*/\2/p' | head -n 1)
+# --------------------------------------------------------------------------------------------------------------------------------------------------------- #
+
+
+
+# CHECK netdata_listen_port PORT # ------------------------------------------------------------------------------------------------------------------------ #
+netstat -ptnul | grep "\:$netdata_listen_port" &> /dev/null
+if [ "$?" = "0" ] ; then
+    echo -e " [>>] ----------------------------------------------------------- [<<]"
+    echo -e "\e[92m [>>] http://$server_ip_address:$netdata_listen_port \e[0m"
+    echo -e "\e[92m [>>] NETDATA USERNAME : $netdata_panel_username \e[0m"
+    echo -e "\e[92m [>>] NETDATA PASSWORD : $netdata_panel_password \e[0m"
+    echo -e " [>>] ----------------------------------------------------------- [<<]"
+else
+    echo -e " [>>] ----------------------------------------------------------- [<<]"
+    echo -e "\e[91m [>>] SOME THINGS WRONG IN INSTALLATION \e[0m"
+    echo -e " [>>] ----------------------------------------------------------- [<<]"
+fi
 # --------------------------------------------------------------------------------------------------------------------------------------------------------- #
