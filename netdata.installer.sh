@@ -182,7 +182,7 @@ EOF
 
 
 # CREATE USERNAME AND PASSWORD FOR NETDATA PANEL # -------------------------------------------------------------------------------------------------------- #
-htpasswd -cdb /etc/nginx/.htpasswd-all $netdata_panel_username $netdata_panel_password
+htpasswd -cdb /etc/nginx/.htpasswd $netdata_panel_username $netdata_panel_password
 # --------------------------------------------------------------------------------------------------------------------------------------------------------- #
 
 
