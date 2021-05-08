@@ -12,6 +12,7 @@
 # --------------------------------------------------------------------------------------------------------------------------------------------------------- #
 
 
+
 # PRINT MSG TO TERMINAL # --------------------------------------------------------------------------------------------------------------------------------- #
 clear
 echo -e "[>>] ----------------------------------------------------------- [<<]"
@@ -26,6 +27,37 @@ unset q
 # --------------------------------------------------------------------------------------------------------------------------------------------------------- #
 
 
+
+# CHECK CONFIG FILE # ------------------------------------------------------------------------------------------------------------------------------------- #
+if [ -f netdata.installer.conf ]
+    source netdata.installer.conf
+else
+    echo -e "[>] cannot access 'netdata.installer.conf': No such file or directory"
+    exit 1
+fi
+# --------------------------------------------------------------------------------------------------------------------------------------------------------- #
+
+
+
+# CHECK VARIABLES # --------------------------------------------------------------------------------------------------------------------------------------- #
+if [ -z "$netdata_listen_port" ] ; then
+    echo -e "[>] netdata_listen_port variable is empty"
+    exit 1
+fi
+
+if [ -z "$netdata_panel_username" ] ; then
+    echo -e "[>] netdata_panel_username variable is empty"
+    exit 1
+fi
+
+if [ -z "$netdata_panel_password" ] ; then
+    echo -e "[>] netdata_panel_password variable is empty"
+    exit 1
+fi
+# --------------------------------------------------------------------------------------------------------------------------------------------------------- #
+
+
+
 # UPDATE AND UPGRADE SYSTEM # ----------------------------------------------------------------------------------------------------------------------------- #
 apt-get update
 apt-get -y dist-upgrade
@@ -34,6 +66,7 @@ apt-get -y -f install
 apt-get clean
 apt-get install -y lsb-release &> /dev/null
 # --------------------------------------------------------------------------------------------------------------------------------------------------------- #
+
 
 
 # CHECK lsb_release # ------------------------------------------------------------------------------------------------------------------------------------- #
@@ -88,7 +121,7 @@ upstream backend {
 }
 
 server {
-    listen 80;
+    listen $netdata_listen_port;
     server_name _;
 
     location / {
@@ -111,22 +144,23 @@ EOF
 
 
 # GET USERNAME FROM USER # -------------------------------------------------------------------------------------------------------------------------------- #
-for (( ;; )) ; do
-    echo -en "[>] ENTER USERNAME [FOR NETDATA] : " ; read username
-    if [ ! -z "$username" ] ; then
-        echo -en "[>] ARE YOU SURE ABOUT USER $username ? [y/n] : " ; read q
-        if [ "$q" = "y" ] ; then
-            break
-        fi
-    fi
-    clear
-done
+# for (( ;; )) ; do
+#    echo -en "[>] ENTER USERNAME [FOR NETDATA] : " ; read username
+#    if [ ! -z "$username" ] ; then
+#        echo -en "[>] ARE YOU SURE ABOUT USER $username ? [y/n] : " ; read q
+#        if [ "$q" = "y" ] ; then
+#            break
+#        fi
+#    fi
+#    clear
+# done
 # --------------------------------------------------------------------------------------------------------------------------------------------------------- #
 
 
 # CREATE USERNAME AND PASSWORD FOR NETDATA PANEL # -------------------------------------------------------------------------------------------------------- #
-echo -e "[>] SET PASSWORD FOR USER $username"
-htpasswd -c /etc/nginx/.htpasswd $username
+# echo -e "[>] SET PASSWORD FOR USER $username"
+# htpasswd -c /etc/nginx/.htpasswd $netdata_panel_username
+htpasswd -cdb /root/.htpasswd-all $netdata_panel_username $netdata_panel_password
 # --------------------------------------------------------------------------------------------------------------------------------------------------------- #
 
 
